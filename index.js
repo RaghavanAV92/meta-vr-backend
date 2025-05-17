@@ -22,8 +22,9 @@ app.use(cors());
 // Function to scrape Meta VR games\
 async function scrapeTopGames() {
   console.log('Scraper Started');
-  const browser = await puppeteer.launch({headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process', ], });
+  const browser = await puppeteer.launch({headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process', ], });
   const page = await browser.newPage();
+  await new Promise(res => setTimeout(res, 3000));
   await page.goto('https://www.meta.com/en-gb/experiences/section/325830172628417/', { waitUntil: 'networkidle2', timeout: 60000 });
   console.log('Main Listing Page Loaded');
 
@@ -152,7 +153,11 @@ async function scrapeTopGames() {
   await browser.close();
 }
 
-scrapeTopGames();
+try {
+  await scrapeTopGames();
+} catch (err) {
+  console.error('Scraper Failed!', err);
+}
 
 //cron.schedule('0 * * * *', scrapeTopGames); // runs every hour
 
