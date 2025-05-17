@@ -31,11 +31,15 @@ app.use(cors());
 async function scrapeTopGames() {
   console.log('Scraper Started');
   const browser = await puppeteer.launch({headless: 'new', executablePath: await puppeteer.executablePath(), args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process', ], });
-  const page = await browser.newPage();
-  await new Promise(res => setTimeout(res, 3000));
-  await page.goto('https://www.meta.com/en-gb/experiences/section/325830172628417/', { waitUntil: 'networkidle2', timeout: 60000 });
-  console.log('Main Listing Page Loaded');
-
+  try {
+    const page = await browser.newPage();
+    await new Promise(res => setTimeout(res, 3000));
+    await page.goto('https://www.meta.com/en-gb/experiences/section/325830172628417/', { waitUntil: 'networkidle2', timeout: 60000 });
+    console.log('Main Listing Page Loaded');
+  } catch (err) {
+    console.error("Failed to scrape main listing page", err.message);
+  }
+  
   const hrefs = await page.evaluate(() => {
     const list = Array.from(document.querySelectorAll('a[role="link"]'))
       .map(el => el.getAttribute('href'))
@@ -73,42 +77,42 @@ async function scrapeTopGames() {
             }
           }
           return null;
+          };
+
+        const getSpanText = (label) => {
+          const span = Array.from(document.querySelectorAll('span')).find(
+            el => el.innerText.toLowerCase().includes(label)
+          );
+          return span ? span.innerText.trim() : null;
         };
 
-      const getSpanText = (label) => {
-        const span = Array.from(document.querySelectorAll('span')).find(
-          el => el.innerText.toLowerCase().includes(label)
-        );
-        return span ? span.innerText.trim() : null;
-      };
-
-      const getNextH1 = (label) => {
-        const spans = Array.from(document.querySelectorAll('span'));
-        for (let i = 0; i < spans.length; i++) {
-          if (spans[i].innerText.toLowerCase().includes(label)) {
-            const h1 = document.querySelector('h1');
-            return h1 ? h1.innerText.trim() : null;
+        const getNextH1 = (label) => {
+          const spans = Array.from(document.querySelectorAll('span'));
+          for (let i = 0; i < spans.length; i++) {
+            if (spans[i].innerText.toLowerCase().includes(label)) {
+              const h1 = document.querySelector('h1');
+              return h1 ? h1.innerText.trim() : null;
+            }
           }
-        }
-        return null;
-      };
+          return null;
+        };
 
-      const getRatingFromAriaLabel = () => {
-        const divs = Array.from(document.querySelectorAll('div'));
-        for (let div of divs) {
-          const label = div.getAttribute('aria-label');
-          if (label && label.toLowerCase().includes('out of 5 rating')) {
-            return label.substring(0, 5).trim();
+        const getRatingFromAriaLabel = () => {
+          const divs = Array.from(document.querySelectorAll('div'));
+          for (let div of divs) {
+            const label = div.getAttribute('aria-label');
+            if (label && label.toLowerCase().includes('out of 5 rating')) {
+              return label.substring(0, 5).trim();
+            }
           }
-        }
-        return null;
-      };
+          return null;
+        };
 
-      const getGameName = () => {
-        const ratingDiv = Array.from(document.querySelectorAll('div')).find(div => {
-          const label = div.getAttribute('aria-label');
-          return label && label.toLowerCase().includes('1 out of 1 rating');
-        });
+        const getGameName = () => {
+          const ratingDiv = Array.from(document.querySelectorAll('div')).find(div => {
+            const label = div.getAttribute('aria-label');
+            return label && label.toLowerCase().includes('1 out of 1 rating');
+          });
 
         if (ratingDiv) {
           let parent = ratingDiv.parentElement;
@@ -140,6 +144,7 @@ async function scrapeTopGames() {
     });
     console.log(`Extracted game data:`, gameData)
     await gamePage.close();
+    await new Promise((res) => setTimeout(res, 3000));
     games.push(gameData);
   } catch (err) {
     console.error(`Error scraping $(fullUrl}:`, err.message);
