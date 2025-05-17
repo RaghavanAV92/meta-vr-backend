@@ -1,14 +1,21 @@
-const express = import('express');
-const cors = require('cors');
-const puppeteer = require('puppeteer');
-const cron = require('node-cron');
-const admin = require('firebase-admin');
+// const express = require('express');
+// const cors = require('cors');
+// const puppeteer = require('puppeteer');
+// const cron = require('node-cron');
+// const admin = require('firebase-admin');
+import express from 'express';
+import cors from 'cors';
+import puppeteer from 'puppeteer';
+import cron from 'node-cron';
+import admin from 'firebase-admin';
+import { readFileSync } from 'fs';
+
 let serviceAccount;
 
 if (process.env.GOOGLE_CREDENTIALS) {
   serviceAccount = JSON.parse(process.env.GOOGLE_CREDENTIALS);
 } else {
-  serviceAccount = require('./firebase-credentials.json');
+  serviceAccount = JSON.parse(readFileSync('./firebase-credentials.json'));
 }
 
 admin.initializeApp({
