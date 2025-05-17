@@ -34,7 +34,12 @@ async function scrapeTopGames() {
   try {
     const page = await browser.newPage();
     await new Promise(res => setTimeout(res, 3000));
-    await page.goto('https://www.meta.com/en-gb/experiences/section/325830172628417/', { waitUntil: 'networkidle2', timeout: 60000 });
+    console.log('Going to open main listing page now...')
+    try {
+      await page.goto('https://www.meta.com/en-gb/experiences/section/325830172628417/', { waitUntil: 'networkidle2', timeout: 60000 });
+    } catch (err) {
+      console.error('Main listing page did not load', err)
+    }
     console.log('Main Listing Page Loaded');
   } catch (err) {
     console.error("Failed to scrape main listing page", err.message);
