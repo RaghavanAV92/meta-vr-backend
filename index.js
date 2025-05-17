@@ -31,147 +31,161 @@ app.use(cors());
 async function scrapeTopGames() {
   console.log('Scraper Started');
   const browser = await puppeteer.launch({headless: 'new', executablePath: await puppeteer.executablePath(), args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process', ], });
+  let page;  // Declare page variable here in the correct scope
+  
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage(); // Assign to the previously declared variable
+    await page.setViewport({ width: 1280, height: 800 });
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36');
+
     await new Promise(res => setTimeout(res, 3000));
     page.setDefaultNavigationTimeout(90000);
+    
     console.log('Going to open main listing page now...')
+    
     try {
       await page.goto('https://www.meta.com/en-gb/experiences/section/325830172628417/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+      console.log('Main Listing Page Loaded!');
     } catch (err) {
       console.error('Main listing page did not load', err)
+      throw err;
     }
-    console.log('Main Listing Page Loaded');
-  } catch (err) {
-    console.error("Failed to scrape main listing page", err.message);
-  }
   
-  const hrefs = await page.evaluate(() => {
-    const list = Array.from(document.querySelectorAll('a[role="link"]'))
-      .map(el => el.getAttribute('href'))
-      .filter(href => {
-        if (!href || !href.startsWith('/en-gb/experiences/')) return false;
+    const hrefs = await page.evaluate(() => {
+      const list = Array.from(document.querySelectorAll('a[role="link"]'))
+        .map(el => el.getAttribute('href'))
+        .filter(href => {
+          if (!href || !href.startsWith('/en-gb/experiences/')) return false;
 
-        const relativePath = href.replace('/en-gb/experiences/', '');
-        if (relativePath.includes('view') || relativePath.includes('section')) return false;
+          const relativePath = href.replace('/en-gb/experiences/', '');
+          if (relativePath.includes('view') || relativePath.includes('section')) return false;
 
-        const regex = /^\/en-gb\/experiences\/[a-z][^\/]*\/\d+\/$/i;
-        return regex.test(href);
-      });
-      list.push('/en-gb/experiences/tempo-travelers/9099897866785044/');
-      return list.slice(0, 50);
-  });
+          const regex = /^\/en-gb\/experiences\/[a-z][^\/]*\/\d+\/$/i;
+          return regex.test(href);
+        });
 
-  console.log(`Found ${hrefs.length} game links`);
+        // Adding Tempo Travelers to the List
+        list.push('/en-gb/experiences/tempo-travelers/9099897866785044/');
+        return list.slice(0, 50);
+    });
 
-  const games = [];
-  for (const href of hrefs) {
-    const gamePage = await browser.newPage();
-    page.setDefaultNavigationTimeout(90000);
-    const fullUrl = 'https://www.meta.com' + href;
-    console.log(`Scraping ${fullUrl}`)
-    try {
-      const gamePage = await browser.newPage();
-      await gamePage.goto(fullUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-      page.setDefaultNavigationTimeout(90000);
+    console.log(`Found ${hrefs.length} game links`);
 
-      const gameData = await gamePage.evaluate(() => {
-        const getTextAfterLabel = (label) => {
-          const spans = Array.from(document.querySelectorAll('span'));
-          for (let i = 0; i < spans.length; i++) {
-            if (spans[i].innerText.toLowerCase().includes(label)) {
-              const next = spans[i + 1];
-              if (next) return next.innerText.trim();
+    const games = [];
+    for (const href of hrefs) {
+      const fullUrl = 'https://www.meta.com' + href;
+      console.log(`Scraping ${fullUrl}`)
+
+      try {
+        const gamePage = await browser.newPage();
+        await gamePage.setViewport({ width: 1280, height: 800 });
+        await gamePage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36');
+        await gamePage.setDefaultNavigationTimeout(90000);
+
+        await gamePage.goto(fullUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        
+        const gameData = await gamePage.evaluate(() => {
+          
+          const getTextAfterLabel = (label) => {
+            const spans = Array.from(document.querySelectorAll('span'));
+            for (let i = 0; i < spans.length; i++) {
+              if (spans[i].innerText.toLowerCase().includes(label)) {
+                const next = spans[i + 1];
+                if (next) return next.innerText.trim();
+              }
             }
-          }
-          return null;
+            return null;
+            };
+
+          const getSpanText = (label) => {
+            const span = Array.from(document.querySelectorAll('span')).find(
+              el => el.innerText.toLowerCase().includes(label)
+            );
+            return span ? span.innerText.trim() : null;
           };
 
-        const getSpanText = (label) => {
-          const span = Array.from(document.querySelectorAll('span')).find(
-            el => el.innerText.toLowerCase().includes(label)
-          );
-          return span ? span.innerText.trim() : null;
-        };
+          const getNextH1 = (label) => {
+            const spans = Array.from(document.querySelectorAll('span'));
+            for (let i = 0; i < spans.length; i++) {
+              if (spans[i].innerText.toLowerCase().includes(label)) {
+                const h1 = document.querySelector('h1');
+                return h1 ? h1.innerText.trim() : null;
+              }
+            }
+            return null;
+          };
 
-        const getNextH1 = (label) => {
-          const spans = Array.from(document.querySelectorAll('span'));
-          for (let i = 0; i < spans.length; i++) {
-            if (spans[i].innerText.toLowerCase().includes(label)) {
-              const h1 = document.querySelector('h1');
-              return h1 ? h1.innerText.trim() : null;
+          const getRatingFromAriaLabel = () => {
+            const divs = Array.from(document.querySelectorAll('div'));
+            for (let div of divs) {
+              const label = div.getAttribute('aria-label');
+              if (label && label.toLowerCase().includes('out of 5 rating')) {
+                return label.substring(0, 5).trim();
+              }
+            }
+            return null;
+          };
+
+          const getGameName = () => {
+            const ratingDiv = Array.from(document.querySelectorAll('div')).find(div => {
+              const label = div.getAttribute('aria-label');
+              return label && label.toLowerCase().includes('1 out of 1 rating');
+            });
+
+          if (ratingDiv) {
+            let parent = ratingDiv.parentElement;
+            for (let i = 0; i < 2; i++) {
+              if (parent) {
+                parent = parent.parentElement;
+              }
+            }
+            const nameDiv = parent ? parent.querySelector('div') : null;
+            if (nameDiv) {
+              const text = nameDiv.innerText.trim();
+              return text.split('\n')[0];
             }
           }
+
           return null;
         };
 
-        const getRatingFromAriaLabel = () => {
-          const divs = Array.from(document.querySelectorAll('div'));
-          for (let div of divs) {
-            const label = div.getAttribute('aria-label');
-            if (label && label.toLowerCase().includes('out of 5 rating')) {
-              return label.substring(0, 5).trim();
-            }
-          }
-          return null;
+        return {
+          url: window.location.href,
+          name: getGameName(),
+          releaseDate: getTextAfterLabel('release date'),
+          website: getTextAfterLabel('website'),
+          rating: getRatingFromAriaLabel(),
+          ratingsReviews: getSpanText('ratings,')
         };
-
-        const getGameName = () => {
-          const ratingDiv = Array.from(document.querySelectorAll('div')).find(div => {
-            const label = div.getAttribute('aria-label');
-            return label && label.toLowerCase().includes('1 out of 1 rating');
-          });
-
-        if (ratingDiv) {
-          let parent = ratingDiv.parentElement;
-          for (let i = 0; i < 2; i++) {
-            if (parent) {
-              parent = parent.parentElement;
-            }
-          }
-          const nameDiv = parent ? parent.querySelector('div') : null;
-          if (nameDiv) {
-            const text = nameDiv.innerText.trim();
-            return text.split('\n')[0];
-          }
-        }
-
-        return null;
-      };
-
-      return {
-        url: window.location.href,
-        name: getGameName(),
-        releaseDate: getTextAfterLabel('release date'),
-        website: getTextAfterLabel
-        ('website'),
-        //rating: getNextH1('all ratings'),
-        rating: getRatingFromAriaLabel(),
-        ratingsReviews: getSpanText('ratings,')
-      };
-    });
-    console.log(`Extracted game data:`, gameData)
-    await gamePage.close();
-    await new Promise((res) => setTimeout(res, 3000));
-    games.push(gameData);
-  } catch (err) {
-    console.error(`Error scraping $(fullUrl}:`, err.message);
-  }
-}
-
-  const now = new Date();
-  for (const game of games) {
-    if (game && game.url) {
-      console.log(`Writing to firestore: ${game.url}`);
-      const gameId = game.url.split('/').filter(Boolean).pop();
-      await db.collection('metaTopGames').doc(gameId).set({
-      ...game,
-        updatedAt: now.toISOString()
       });
+
+      console.log(`Extracted game data:`, gameData)
+      await gamePage.close();
+      await new Promise((res) => setTimeout(res, 3000));
+      games.push(gameData);
+    } catch (err) {
+      console.error(`Error scraping $(fullUrl}:`, err.message);
     }
   }
-  console.log('Scraping & Saving Complete')
-  await browser.close();
+
+    const now = new Date();
+    for (const game of games) {
+      if (game && game.url) {
+        console.log(`Writing to firestore: ${game.url}`);
+        const gameId = game.url.split('/').filter(Boolean).pop();
+        await db.collection('metaTopGames').doc(gameId).set({
+        ...game,
+          updatedAt: now.toISOString()
+        });
+      }
+    }
+    console.log('Scraping & Saving Complete')
+    await browser.close();
+  } catch (err) {
+      console.error("Failed to scrape:", err.message);
+    } finally {
+      await browser.close();
+    }
 }
 
 try {
@@ -180,7 +194,16 @@ try {
   console.error('Scraper Failed!', err);
 }
 
-//cron.schedule('0 * * * *', scrapeTopGames); // runs every hour
+
+// cron.schedule('0 * * * *', async () => {
+//   console.log('Running scheduled scrape');
+//   try {
+//     await scrapeTopGames();
+//   } catch (err) {
+//     console.error('Scheduled scrape failed:', err);
+//   }
+// });
+
 
 app.get('/api/games', async (req, res) => {
   const snapshot = await db.collection('metaTopGames').get();
