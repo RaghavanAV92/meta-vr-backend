@@ -34,9 +34,10 @@ async function scrapeTopGames() {
   try {
     const page = await browser.newPage();
     await new Promise(res => setTimeout(res, 3000));
+    page.setDefaultNavigationTimeout(90000);
     console.log('Going to open main listing page now...')
     try {
-      await page.goto('https://www.meta.com/en-gb/experiences/section/325830172628417/', { waitUntil: 'networkidle2', timeout: 60000 });
+      await page.goto('https://www.meta.com/en-gb/experiences/section/325830172628417/', { waitUntil: 'domcontentloaded', timeout: 60000 });
     } catch (err) {
       console.error('Main listing page did not load', err)
     }
@@ -66,11 +67,13 @@ async function scrapeTopGames() {
   const games = [];
   for (const href of hrefs) {
     const gamePage = await browser.newPage();
+    page.setDefaultNavigationTimeout(90000);
     const fullUrl = 'https://www.meta.com' + href;
     console.log(`Scraping ${fullUrl}`)
     try {
       const gamePage = await browser.newPage();
-      await gamePage.goto(fullUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+      await gamePage.goto(fullUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      page.setDefaultNavigationTimeout(90000);
 
       const gameData = await gamePage.evaluate(() => {
         const getTextAfterLabel = (label) => {
