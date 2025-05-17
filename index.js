@@ -9,6 +9,7 @@ import puppeteer from 'puppeteer';
 import cron from 'node-cron';
 import admin from 'firebase-admin';
 import { readFileSync } from 'fs';
+console.log('Chromium path:', await puppeteer.executablePath());
 
 let serviceAccount;
 
@@ -29,7 +30,7 @@ app.use(cors());
 // Function to scrape Meta VR games\
 async function scrapeTopGames() {
   console.log('Scraper Started');
-  const browser = await puppeteer.launch({headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process', ], });
+  const browser = await puppeteer.launch({headless: 'new', executablePath: await puppeteer.executablePath(), args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process', ], });
   const page = await browser.newPage();
   await new Promise(res => setTimeout(res, 3000));
   await page.goto('https://www.meta.com/en-gb/experiences/section/325830172628417/', { waitUntil: 'networkidle2', timeout: 60000 });
