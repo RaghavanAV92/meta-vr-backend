@@ -1,4 +1,4 @@
-const express = require('express');
+const express = import('express');
 const cors = require('cors');
 const puppeteer = require('puppeteer');
 const cron = require('node-cron');
