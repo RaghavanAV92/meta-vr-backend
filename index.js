@@ -3,7 +3,13 @@ const cors = require('cors');
 const puppeteer = require('puppeteer');
 const cron = require('node-cron');
 const admin = require('firebase-admin');
-const serviceAccount = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+let serviceAccount;
+
+if (process.env.GOOGLE_CREDENTIALS) {
+  serviceAccount = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+} else {
+  serviceAccount = require('./firebase-credentials.json');
+}
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -114,9 +120,10 @@ async function scrapeTopGames() {
 
       return {
         url: window.location.href,
-        gameName: getGameName(),
+        name: getGameName(),
         releaseDate: getTextAfterLabel('release date'),
-        website: getTextAfterLabel('website'),
+        website: getTextAfterLabel
+        ('website'),
         //rating: getNextH1('all ratings'),
         rating: getRatingFromAriaLabel(),
         ratingsReviews: getSpanText('ratings,')
